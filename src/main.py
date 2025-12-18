@@ -1,4 +1,6 @@
 from decision_engine.engine import DecisionEngine
+from carbon_model.carbon_estimator import CarbonEstimator
+
 
 def main():
     weights = {
@@ -9,13 +11,17 @@ def main():
     }
 
     engine = DecisionEngine(weights)
+    carbon_estimator = CarbonEstimator(emission_factor=0.1)
+
+    flight_distance_km = 1500  # example distance
+    estimated_carbon = carbon_estimator.estimate(flight_distance_km)
 
     options = [
         {
             "action": "delay_flight",
             "parameters": {
                 "delay": 120,
-                "carbon": 200,
+                "carbon": estimated_carbon,
                 "technical_risk": 0.3,
                 "crew_compliance": 1
             }
