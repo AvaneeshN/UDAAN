@@ -1,16 +1,7 @@
 class DecisionEngine:
-    def __init__(self, weights: dict):
-        """
-        weights: importance of each factor in decision making
-        example:
-        {
-            'delay': 0.3,
-            'carbon': 0.2,
-            'technical_risk': 0.25,
-            'crew_compliance': 0.25
-        }
-        """
+    def __init__(self, weights: dict, constraints: list = None):
         self.weights = weights
+        self.constraints = constraints or []
 
     def score_option(self, parameters: dict) -> float:
         """
@@ -27,6 +18,7 @@ class DecisionEngine:
         for key, weight in self.weights.items():
             score += weight * parameters.get(key, 0)
         return score
+
     def _normalize_scores(self, scored: list) -> list:
         """
         scored: list of (action, raw_score)
@@ -47,13 +39,29 @@ class DecisionEngine:
         return normalized
 
     def recommend(self, options: list) -> dict:
-        scored = []
+        valid_options = []
+
+        # 1️⃣ Apply constraints FIRST
         for option in options:
+            if all(c.is_allowed(option) for c in self.constraints):
+                valid_options.append(option)
+
+        if not valid_options:
+            return {
+                "recommended_action": None,
+                "reason": "All options violate constraints"
+            }
+
+        # 2️⃣ Score valid options
+        scored = []
+        for option in valid_options:
             score = self.score_option(option['parameters'])
             scored.append((option['action'], score))
 
+        # 3️⃣ Normalize scores
         normalized = self._normalize_scores(scored)
 
+        # 4️⃣ Choose best option
         recommended_action = min(normalized, key=lambda x: x[1])[0]
 
         return {

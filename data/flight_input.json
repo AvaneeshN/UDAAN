@@ -1,6 +1,6 @@
 {
   "flight_distance_km": 1500,
-  "delay_minutes": 120,
+  "delay_minutes": 90,
   "crew_compliance": 1,
   "aircraft": {
     "aircraft_age_years": 18,

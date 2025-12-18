@@ -3,6 +3,9 @@ from carbon_model.carbon_estimator import CarbonEstimator
 from technical_risk.technical_risk import compute_technical_risk
 from risk_prediction.historical_disruption import compute_historical_disruption_score
 from policies.policy_loader import load_policy
+from constraints.crew_constraint import CrewDutyConstraint
+from constraints.safety_constraint import SafetyRiskConstraint
+
 import json
 import os
 
@@ -16,51 +19,59 @@ def load_flight_data(path: str):
 
 def main():
     # 1️⃣ Load airline policy
-    airline_code = "indigo"  # can be changed to "airindia"
+    airline_code = "indigo"  # can switch to "airindia"
     policy_path = os.path.join(BASE_DIR, "policies", f"{airline_code}.json")
     policy = load_policy(policy_path)
-    policy = load_policy(policy_path)
-    weights = policy["weights"] 
 
+    weights = policy["weights"]
+    emission_factor = policy.get("emission_factor", 0.1)
 
+    constraints = [
+    CrewDutyConstraint(max_delay_minutes=180),
+    SafetyRiskConstraint(max_allowed_risk=0.7)
+    ]
 
-    engine = DecisionEngine(weights)
-
-    # 2️⃣ Load flight input data
-    flight_data_path = os.path.join(os.path.dirname(BASE_DIR), "data", "flight_input.json")
+    # 2️⃣ Initialize decision engine (constraints can be added later)
+    engine = DecisionEngine(
+    weights=weights,
+    constraints=constraints
+    )
+    # 3️⃣ Load flight input data
+    flight_data_path = os.path.join(
+        os.path.dirname(BASE_DIR), "data", "flight_input.json"
+    )
     flight_data = load_flight_data(flight_data_path)
 
-
-    # 3️⃣ Carbon estimation
-    carbon_estimator = CarbonEstimator(emission_factor=0.1)
+    # 4️⃣ Carbon estimation
+    carbon_estimator = CarbonEstimator(emission_factor=emission_factor)
     estimated_carbon = carbon_estimator.estimate(
         flight_data["flight_distance_km"]
     )
 
-    # 4️⃣ Technical risk calculation
+    # 5️⃣ Technical risk calculation
     technical_risk = compute_technical_risk(
         **flight_data["aircraft"]
     )
 
-    # 5️⃣ Historical disruption calculation
+    # 6️⃣ Historical disruption calculation
     historical_disruption = compute_historical_disruption_score(
         **flight_data["history"]
     )
 
-    # 6️⃣ Aggregate operational risk
+    # 7️⃣ Aggregate operational risk (used consistently)
     overall_operational_risk = (
         0.6 * technical_risk +
         0.4 * historical_disruption
     )
 
-    # 7️⃣ Decision options
+    # 8️⃣ Decision options (same risk basis for fairness)
     options = [
         {
             "action": "delay_flight",
             "parameters": {
                 "delay": flight_data["delay_minutes"],
                 "carbon": estimated_carbon,
-                "technical_risk": technical_risk,
+                "technical_risk": overall_operational_risk,
                 "crew_compliance": flight_data["crew_compliance"]
             }
         },
@@ -75,7 +86,7 @@ def main():
         }
     ]
 
-    # 8️⃣ Recommendation
+    # 9️⃣ Recommendation
     decision = engine.recommend(options)
 
     print("\nDecision:", decision)
