@@ -5,6 +5,8 @@ from risk_prediction.historical_disruption import compute_historical_disruption_
 from policies.policy_loader import load_policy
 from constraints.crew_constraint import CrewDutyConstraint
 from constraints.safety_constraint import SafetyRiskConstraint
+from explainability.explainer import DecisionExplainer
+
 
 import json
 import os
@@ -89,7 +91,15 @@ def main():
     # 9️⃣ Recommendation
     decision = engine.recommend(options)
 
-    print("\nDecision:", decision)
+    explainer = DecisionExplainer()
+    explanation = explainer.explain(decision, options, weights)
+
+    print("\n--- Decision Explanation ---")
+    for item in explanation["reasoning"]:
+        print(item)
+
+    print("\nFinal Reason:", explanation["final_decision_reason"])
+
     print("Technical Risk:", round(technical_risk, 3))
     print("Historical Disruption:", round(historical_disruption, 3))
     print("Overall Operational Risk:", round(overall_operational_risk, 3))
