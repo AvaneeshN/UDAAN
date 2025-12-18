@@ -1,0 +1,17 @@
+{
+  "flight_distance_km": 1500,
+  "delay_minutes": 120,
+  "crew_compliance": 1,
+  "aircraft": {
+    "aircraft_age_years": 18,
+    "recent_technical_issues": 2,
+    "maintenance_delay_count": 1,
+    "past_flight_disruptions": 3
+  },
+  "history": {
+    "past_delays": 6,
+    "past_cancellations": 2,
+    "technical_cancellations": 1,
+    "recent_disruptions": 2
+  }
+}

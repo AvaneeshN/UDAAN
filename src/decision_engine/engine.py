@@ -27,18 +27,37 @@ class DecisionEngine:
         for key, weight in self.weights.items():
             score += weight * parameters.get(key, 0)
         return score
+    def _normalize_scores(self, scored: list) -> list:
+        """
+        scored: list of (action, raw_score)
+        returns: list of (action, normalized_score)
+        """
+        scores = [score for _, score in scored]
+        min_score = min(scores)
+        max_score = max(scores)
+
+        if max_score == min_score:
+            return [(action, 0.0) for action, _ in scored]
+
+        normalized = []
+        for action, score in scored:
+            norm = (score - min_score) / (max_score - min_score)
+            normalized.append((action, round(norm, 3)))
+
+        return normalized
 
     def recommend(self, options: list) -> dict:
-        """
-        options: list of possible actions with parameters
-        """
         scored = []
         for option in options:
             score = self.score_option(option['parameters'])
             scored.append((option['action'], score))
 
-        scored.sort(key=lambda x: x[1])
+        normalized = self._normalize_scores(scored)
+
+        recommended_action = min(normalized, key=lambda x: x[1])[0]
+
         return {
-            "recommended_action": scored[0][0],
-            "all_scores": scored
+            "recommended_action": recommended_action,
+            "normalized_scores": normalized,
+            "raw_scores": scored
         }

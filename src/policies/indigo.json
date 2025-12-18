@@ -1,0 +1,9 @@
+{
+  "airline": "IndiGo",
+  "weights": {
+    "delay": 0.35,
+    "carbon": 0.15,
+    "technical_risk": 0.30,
+    "crew_compliance": 0.20
+  }
+}

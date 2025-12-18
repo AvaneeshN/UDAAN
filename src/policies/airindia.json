@@ -1,0 +1,9 @@
+{
+  "airline": "Air India",
+  "weights": {
+    "delay": 0.20,
+    "carbon": 0.10,
+    "technical_risk": 0.40,
+    "crew_compliance": 0.30
+  }
+}
