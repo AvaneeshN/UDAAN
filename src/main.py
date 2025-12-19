@@ -31,7 +31,6 @@ def main():
     policy = load_policy(os.path.join(BASE_DIR, "policies", f"{airline_code}.json"))
 
     weights = policy["weights"]
-    emission_factor = policy.get("emission_factor", 0.1)
 
     constraints = [
         CrewDutyConstraint(max_delay_minutes=180),
@@ -74,11 +73,14 @@ def main():
         curfew_active=False
     )
 
+    # ✅ Distance derived (not in JSON by design)
+    distance_km = 1500
+
     flight = Flight(
         flight_id=raw["flight_id"],
         origin=origin,
         destination=destination,
-        distance_km=1500,
+        distance_km=distance_km,
         aircraft=aircraft,
         crew=crew,
         scheduled_delay_min=raw["delay_minutes"],
@@ -87,9 +89,8 @@ def main():
 
     # 4️⃣ Risk calculations
     technical_risk = compute_technical_risk(
-        aircraft.age_years,
-        aircraft.technical_failure_rate,
-        aircraft.avg_tech_delay_min
+        aircraft=aircraft,
+        technical_cancellations=raw["history"]["technical_cancellations"]
     )
 
     historical_disruption = compute_historical_disruption_score(
@@ -102,9 +103,9 @@ def main():
 
     # 5️⃣ Carbon
     carbon_estimator = CarbonEstimator(aircraft.emission_factor)
-    carbon_emission = carbon_estimator.estimate(flight.distance_km)
+    carbon_emission = carbon_estimator.estimate(distance_km)
 
-    # 6️⃣ Decision options (engine uses dicts)
+    # 6️⃣ Decision options
     options = [
         {
             "action": "delay_flight",

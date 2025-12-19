@@ -11,3 +11,5 @@ class DecisionResult:
     raw_scores: List[Tuple[str, float]]
     explanation: dict
     decision_time: datetime
+
+
