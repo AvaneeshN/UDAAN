@@ -13,7 +13,10 @@ from models.airport import Airport
 from models.flight import Flight
 from models.decision_result import DecisionResult
 
-from datetime import datetime
+from ml.risk_model import MLRiskPredictor
+
+from datetime import datetime, timezone
+import numpy as np
 import json
 import os
 
@@ -26,7 +29,7 @@ def load_json(path: str):
 
 
 def main():
-    # 1️⃣ Load airline policy
+    # 1️⃣ Policy
     airline_code = "indigo"
     policy = load_policy(os.path.join(BASE_DIR, "policies", f"{airline_code}.json"))
 
@@ -40,41 +43,17 @@ def main():
     engine = DecisionEngine(weights, constraints)
     explainer = DecisionExplainer()
 
-    # 2️⃣ Load flight JSON
+    # 2️⃣ Load input
     raw = load_json(os.path.join(os.path.dirname(BASE_DIR), "data", "flight_input.json"))
 
-    # 3️⃣ Build domain models
-    aircraft = Aircraft(
-        aircraft_id=raw["aircraft"]["aircraft_id"],
-        aircraft_type=raw["aircraft"]["aircraft_type"],
-        age_years=raw["aircraft"]["age_years"],
-        emission_factor=raw["aircraft"]["emission_factor"],
-        technical_failure_rate=raw["aircraft"]["technical_failure_rate"],
-        avg_tech_delay_min=raw["aircraft"]["avg_tech_delay_min"]
-    )
+    # 3️⃣ Domain models
+    aircraft = Aircraft(**raw["aircraft"])
+    crew = Crew(**raw["crew"])
 
-    crew = Crew(
-        crew_id=raw["crew"]["crew_id"],
-        duty_hours_today=raw["crew"]["duty_hours_today"],
-        max_duty_hours=raw["crew"]["max_duty_hours"]
-    )
+    origin = Airport(code=raw["origin"]["code"], congestion_level=0.5, weather_severity=0.4, curfew_active=False)
+    destination = Airport(code=raw["destination"]["code"], congestion_level=0.6, weather_severity=0.3, curfew_active=False)
 
-    origin = Airport(
-        code=raw["origin"]["code"],
-        congestion_level=0.5,
-        weather_severity=0.4,
-        curfew_active=False
-    )
-
-    destination = Airport(
-        code=raw["destination"]["code"],
-        congestion_level=0.6,
-        weather_severity=0.3,
-        curfew_active=False
-    )
-
-    # ✅ Distance derived (not in JSON by design)
-    distance_km = 1500
+    distance_km = 1500  # derived
 
     flight = Flight(
         flight_id=raw["flight_id"],
@@ -87,25 +66,43 @@ def main():
         passenger_count=raw["passenger_count"]
     )
 
-    # 4️⃣ Risk calculations
+    # 4️⃣ Rule-based risks
     technical_risk = compute_technical_risk(
         aircraft=aircraft,
         technical_cancellations=raw["history"]["technical_cancellations"]
     )
 
-    historical_disruption = compute_historical_disruption_score(
-        **raw["history"]
-    )
+    historical_disruption = compute_historical_disruption_score(**raw["history"])
 
-    overall_operational_risk = round(
+    rule_based_risk = round(
         0.6 * technical_risk + 0.4 * historical_disruption, 3
     )
 
-    # 5️⃣ Carbon
-    carbon_estimator = CarbonEstimator(aircraft.emission_factor)
-    carbon_emission = carbon_estimator.estimate(distance_km)
+    # 5️⃣ ML Risk (Step 14)
+    ml_predictor = MLRiskPredictor()
 
-    # 6️⃣ Decision options
+    ml_features = np.array([
+        aircraft.age_years,
+        aircraft.technical_failure_rate,
+        aircraft.avg_tech_delay_min,
+        raw["history"]["past_delays"],
+        raw["history"]["past_cancellations"],
+        raw["history"]["technical_cancellations"],
+        crew.duty_hours_today / crew.max_duty_hours,
+        flight.scheduled_delay_min
+    ])
+
+    ml_risk = ml_predictor.predict_risk(ml_features)
+
+    # 6️⃣ Hybrid risk (ML assists, does not decide)
+    overall_operational_risk = round(
+        0.7 * rule_based_risk + 0.3 * ml_risk, 3
+    )
+
+    # 7️⃣ Carbon
+    carbon_emission = CarbonEstimator(aircraft.emission_factor).estimate(distance_km)
+
+    # 8️⃣ Options
     options = [
         {
             "action": "delay_flight",
@@ -127,7 +124,7 @@ def main():
         }
     ]
 
-    # 7️⃣ Decision
+    # 9️⃣ Decision
     decision = engine.recommend(options)
     explanation = explainer.explain(decision, options, weights)
 
@@ -136,18 +133,23 @@ def main():
         recommended_action=decision["recommended_action"],
         normalized_scores=decision["normalized_scores"],
         raw_scores=decision["raw_scores"],
-        explanation=explanation,
-        decision_time=datetime.utcnow()
+        explanation={
+            **explanation,
+            "ml_risk": ml_risk,
+            "rule_based_risk": rule_based_risk,
+            "overall_operational_risk": overall_operational_risk
+        },
+        decision_time=datetime.now(timezone.utc)
     )
 
-    # 8️⃣ Output
+    # 🔟 Output
     print("\n--- Decision Explanation ---")
     for r in explanation["reasoning"]:
         print(r)
 
     print("\nFinal Decision:", result.recommended_action)
-    print("Technical Risk:", technical_risk)
-    print("Historical Disruption:", historical_disruption)
+    print("Rule-Based Risk:", rule_based_risk)
+    print("ML Risk:", ml_risk)
     print("Overall Risk:", overall_operational_risk)
 
 
