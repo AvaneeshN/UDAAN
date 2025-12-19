@@ -7,74 +7,112 @@ from constraints.crew_constraint import CrewDutyConstraint
 from constraints.safety_constraint import SafetyRiskConstraint
 from explainability.explainer import DecisionExplainer
 
+from models.aircraft import Aircraft
+from models.crew import Crew
+from models.airport import Airport
+from models.flight import Flight
+from models.decision_result import DecisionResult
 
+from datetime import datetime
 import json
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def load_flight_data(path: str):
+def load_json(path: str):
     with open(path, "r") as f:
         return json.load(f)
 
 
 def main():
     # 1️⃣ Load airline policy
-    airline_code = "indigo"  # can switch to "airindia"
-    policy_path = os.path.join(BASE_DIR, "policies", f"{airline_code}.json")
-    policy = load_policy(policy_path)
+    airline_code = "indigo"
+    policy = load_policy(os.path.join(BASE_DIR, "policies", f"{airline_code}.json"))
 
     weights = policy["weights"]
     emission_factor = policy.get("emission_factor", 0.1)
 
     constraints = [
-    CrewDutyConstraint(max_delay_minutes=180),
-    SafetyRiskConstraint(max_allowed_risk=0.7)
+        CrewDutyConstraint(max_delay_minutes=180),
+        SafetyRiskConstraint(max_allowed_risk=0.7)
     ]
 
-    # 2️⃣ Initialize decision engine (constraints can be added later)
-    engine = DecisionEngine(
-    weights=weights,
-    constraints=constraints
-    )
-    # 3️⃣ Load flight input data
-    flight_data_path = os.path.join(
-        os.path.dirname(BASE_DIR), "data", "flight_input.json"
-    )
-    flight_data = load_flight_data(flight_data_path)
+    engine = DecisionEngine(weights, constraints)
+    explainer = DecisionExplainer()
 
-    # 4️⃣ Carbon estimation
-    carbon_estimator = CarbonEstimator(emission_factor=emission_factor)
-    estimated_carbon = carbon_estimator.estimate(
-        flight_data["flight_distance_km"]
+    # 2️⃣ Load flight JSON
+    raw = load_json(os.path.join(os.path.dirname(BASE_DIR), "data", "flight_input.json"))
+
+    # 3️⃣ Build domain models
+    aircraft = Aircraft(
+        aircraft_id=raw["aircraft"]["aircraft_id"],
+        aircraft_type=raw["aircraft"]["aircraft_type"],
+        age_years=raw["aircraft"]["age_years"],
+        emission_factor=raw["aircraft"]["emission_factor"],
+        technical_failure_rate=raw["aircraft"]["technical_failure_rate"],
+        avg_tech_delay_min=raw["aircraft"]["avg_tech_delay_min"]
     )
 
-    # 5️⃣ Technical risk calculation
+    crew = Crew(
+        crew_id=raw["crew"]["crew_id"],
+        duty_hours_today=raw["crew"]["duty_hours_today"],
+        max_duty_hours=raw["crew"]["max_duty_hours"]
+    )
+
+    origin = Airport(
+        code=raw["origin"]["code"],
+        congestion_level=0.5,
+        weather_severity=0.4,
+        curfew_active=False
+    )
+
+    destination = Airport(
+        code=raw["destination"]["code"],
+        congestion_level=0.6,
+        weather_severity=0.3,
+        curfew_active=False
+    )
+
+    flight = Flight(
+        flight_id=raw["flight_id"],
+        origin=origin,
+        destination=destination,
+        distance_km=1500,
+        aircraft=aircraft,
+        crew=crew,
+        scheduled_delay_min=raw["delay_minutes"],
+        passenger_count=raw["passenger_count"]
+    )
+
+    # 4️⃣ Risk calculations
     technical_risk = compute_technical_risk(
-        **flight_data["aircraft"]
+        aircraft.age_years,
+        aircraft.technical_failure_rate,
+        aircraft.avg_tech_delay_min
     )
 
-    # 6️⃣ Historical disruption calculation
     historical_disruption = compute_historical_disruption_score(
-        **flight_data["history"]
+        **raw["history"]
     )
 
-    # 7️⃣ Aggregate operational risk (used consistently)
-    overall_operational_risk = (
-        0.6 * technical_risk +
-        0.4 * historical_disruption
+    overall_operational_risk = round(
+        0.6 * technical_risk + 0.4 * historical_disruption, 3
     )
 
-    # 8️⃣ Decision options (same risk basis for fairness)
+    # 5️⃣ Carbon
+    carbon_estimator = CarbonEstimator(aircraft.emission_factor)
+    carbon_emission = carbon_estimator.estimate(flight.distance_km)
+
+    # 6️⃣ Decision options (engine uses dicts)
     options = [
         {
             "action": "delay_flight",
             "parameters": {
-                "delay": flight_data["delay_minutes"],
-                "carbon": estimated_carbon,
+                "delay": flight.scheduled_delay_min,
+                "carbon": carbon_emission,
                 "technical_risk": overall_operational_risk,
-                "crew_compliance": flight_data["crew_compliance"]
+                "crew_compliance": 1 if crew.duty_hours_today < crew.max_duty_hours else 0
             }
         },
         {
@@ -83,26 +121,33 @@ def main():
                 "delay": 0,
                 "carbon": 0,
                 "technical_risk": overall_operational_risk,
-                "crew_compliance": flight_data["crew_compliance"]
+                "crew_compliance": 1
             }
         }
     ]
 
-    # 9️⃣ Recommendation
+    # 7️⃣ Decision
     decision = engine.recommend(options)
-
-    explainer = DecisionExplainer()
     explanation = explainer.explain(decision, options, weights)
 
+    result = DecisionResult(
+        flight_id=flight.flight_id,
+        recommended_action=decision["recommended_action"],
+        normalized_scores=decision["normalized_scores"],
+        raw_scores=decision["raw_scores"],
+        explanation=explanation,
+        decision_time=datetime.utcnow()
+    )
+
+    # 8️⃣ Output
     print("\n--- Decision Explanation ---")
-    for item in explanation["reasoning"]:
-        print(item)
+    for r in explanation["reasoning"]:
+        print(r)
 
-    print("\nFinal Reason:", explanation["final_decision_reason"])
-
-    print("Technical Risk:", round(technical_risk, 3))
-    print("Historical Disruption:", round(historical_disruption, 3))
-    print("Overall Operational Risk:", round(overall_operational_risk, 3))
+    print("\nFinal Decision:", result.recommended_action)
+    print("Technical Risk:", technical_risk)
+    print("Historical Disruption:", historical_disruption)
+    print("Overall Risk:", overall_operational_risk)
 
 
 if __name__ == "__main__":

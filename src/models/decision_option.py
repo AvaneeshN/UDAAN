@@ -9,3 +9,4 @@ class DecisionOption:
     flight: Flight
     action: str  # "DELAY", "CANCEL", "REROUTE"
     parameters: Dict[str, float]
+

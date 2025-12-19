@@ -1,13 +1,32 @@
 {
-  "flight_distance_km": 1500,
+  "flight_id": "6E-203",
   "delay_minutes": 90,
-  "crew_compliance": 1,
-  "aircraft": {
-    "aircraft_age_years": 18,
-    "recent_technical_issues": 2,
-    "maintenance_delay_count": 1,
-    "past_flight_disruptions": 3
+  "passenger_count": 180,
+
+  "origin": {
+    "code": "DEL",
+    "name": "Delhi"
   },
+  "destination": {
+    "code": "BOM",
+    "name": "Mumbai"
+  },
+
+  "aircraft": {
+    "aircraft_id": "VT-ABC",
+    "aircraft_type": "A320",
+    "age_years": 18,
+    "emission_factor": 0.1,
+    "technical_failure_rate": 0.3,
+    "avg_tech_delay_min": 25
+  },
+
+  "crew": {
+    "crew_id": "CRW-77",
+    "duty_hours_today": 7.5,
+    "max_duty_hours": 10
+  },
+
   "history": {
     "past_delays": 6,
     "past_cancellations": 2,
