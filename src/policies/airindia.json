@@ -4,6 +4,6 @@
     "delay": 0.20,
     "carbon": 0.10,
     "technical_risk": 0.40,
-    "crew_compliance": 0.30
+    "cancellation_impact": 0.30
   }
 }

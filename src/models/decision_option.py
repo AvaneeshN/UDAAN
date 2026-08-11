@@ -10,3 +10,4 @@ class DecisionOption:
     action: str  # "DELAY", "CANCEL", "REROUTE"
     parameters: Dict[str, float]
 
+#unused in main yet, but could be useful for future extensions or features

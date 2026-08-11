@@ -1,6 +1,6 @@
-from .base_constraint import Constraint
+from .base_constraint import BaseConstraint
 
-class CarbonConstraint(Constraint):
+class CarbonConstraint(BaseConstraint):
     def __init__(self, max_carbon_kg: float):
         self.max_carbon_kg = max_carbon_kg
 

@@ -17,24 +17,23 @@ class DecisionExplainer:
             return explanation
 
         for action, score in decision["raw_scores"]:
+            option = next(option for option in options if option["action"] == action)
+
+            raw_parameters = option["parameters"]
+            normalized_parameters = option["normalized_parameters"]
+
             breakdown = {
                 "action": action,
                 "score": round(score, 3),
+                "raw_parameters": raw_parameters,
+                "normalized_parameters": normalized_parameters,
                 "contributions": {}
             }
-
-            option = next(
-                opt for opt in options if opt["action"] == action
-            )
-
-            for param, weight in weights.items():
-                value = option["parameters"].get(param, 0)
-                breakdown["contributions"][param] = round(
-                    weight * value, 3
-                )
-
+            for parameter_name, weight in weights.items():
+                normalized_value = normalized_parameters.get(parameter_name, 0)
+                contribution = weight* normalized_value
+                breakdown["contributions"][parameter_name] = round(contribution, 3)
             explanation["reasoning"].append(breakdown)
-
         explanation["final_decision_reason"] = (
             f"{decision['recommended_action']} has the lowest overall "
             "normalized operational penalty after constraint filtering."

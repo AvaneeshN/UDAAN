@@ -5,6 +5,9 @@ class CrewDutyConstraint(BaseConstraint):
         self.max_delay_minutes = max_delay_minutes
 
     def is_allowed(self, option: dict) -> bool:
+        #cancelling flight does not require the crew to operate the aircraft, so it's always allowed
+        if option.get("action") == "cancel_flight":
+            return True
         delay = option["parameters"].get("delay", 0)
         crew_ok = option["parameters"].get("crew_compliance", 0)
 

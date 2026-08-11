@@ -3,20 +3,21 @@ class DecisionEngine:
         self.weights = weights
         self.constraints = constraints or []
 
-    def score_option(self, parameters: dict) -> float:
+    def score_option(self, normalized_parameters: dict) -> float:
         """
-        parameters: values for each factor
+        normalized_parameters: values for each factor (normalized to 0-1)
         example:
         {
-            'delay': 120,
-            'carbon': 300,
-            'technical_risk': 0.4,
-            'crew_compliance': 1
+            'delay': 0.5,
+            'carbon': 0.8,
+            'technical_risk': 0.3,
+            'crew_compliance': 1.0
         }
         """
         score = 0.0
-        for key, weight in self.weights.items():
-            score += weight * parameters.get(key, 0)
+        for parameter_name, weight in self.weights.items():
+            normalized_value = normalized_parameters.get(parameter_name , 0)
+            score += weight * normalized_value
         return score
 
     def _normalize_scores(self, scored: list) -> list:
@@ -49,14 +50,16 @@ class DecisionEngine:
         if not valid_options:
             return {
                 "recommended_action": None,
+                "normalized_scores": [],
+                "raw_scores":[],
                 "reason": "All options violate constraints"
             }
 
         # 2️⃣ Score valid options
         scored = []
         for option in valid_options:
-            score = self.score_option(option['parameters'])
-            scored.append((option['action'], score))
+            score = self.score_option(option["normalized_parameters"])
+            scored.append((option["action"], score))
 
         # 3️⃣ Normalize scores
         normalized = self._normalize_scores(scored)
@@ -67,5 +70,6 @@ class DecisionEngine:
         return {
             "recommended_action": recommended_action,
             "normalized_scores": normalized,
-            "raw_scores": scored
+            "raw_scores": scored,
+            "reason": None
         }

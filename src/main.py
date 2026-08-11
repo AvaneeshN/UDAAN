@@ -4,28 +4,21 @@ from technical_risk.technical_risk import compute_technical_risk
 from risk_prediction.historical_disruption import compute_historical_disruption_score
 from policies.policy_loader import load_policy
 from constraints.crew_constraint import CrewDutyConstraint
+from constraints.carbon_constraint import CarbonConstraint
 from constraints.safety_constraint import SafetyRiskConstraint
 from explainability.explainer import DecisionExplainer
-
-from models.aircraft import Aircraft
-from models.crew import Crew
-from models.airport import Airport
-from models.flight import Flight
+from ingestion.json_ingestor import load_json_data
+from models.factory import build_flight_from_json
 from models.decision_result import DecisionResult
-
+from normalization.parameter_normalizer import normalize_parameters
 from ml.risk_model import MLRiskPredictor
 
 from datetime import datetime, timezone
 import numpy as np
-import json
 import os
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-
-def load_json(path: str):
-    with open(path, "r") as f:
-        return json.load(f)
 
 
 def main():
@@ -43,28 +36,20 @@ def main():
     engine = DecisionEngine(weights, constraints)
     explainer = DecisionExplainer()
 
-    # 2️⃣ Load input
-    raw = load_json(os.path.join(os.path.dirname(BASE_DIR), "data", "flight_input.json"))
-
-    # 3️⃣ Domain models
-    aircraft = Aircraft(**raw["aircraft"])
-    crew = Crew(**raw["crew"])
-
-    origin = Airport(code=raw["origin"]["code"], congestion_level=0.5, weather_severity=0.4, curfew_active=False)
-    destination = Airport(code=raw["destination"]["code"], congestion_level=0.6, weather_severity=0.3, curfew_active=False)
-
-    distance_km = 1500  # derived
-
-    flight = Flight(
-        flight_id=raw["flight_id"],
-        origin=origin,
-        destination=destination,
-        distance_km=distance_km,
-        aircraft=aircraft,
-        crew=crew,
-        scheduled_delay_min=raw["delay_minutes"],
-        passenger_count=raw["passenger_count"]
+    # 2️⃣ Load raw input data
+    input_path = os.path.join(
+        os.path.dirname(BASE_DIR), 
+        "data",
+        "flight_input.json"
     )
+
+    raw = load_json_data(input_path)
+
+    # 3️⃣ Convert raw data into domain models
+    flight = build_flight_from_json(raw)
+    aircraft = flight.aircraft
+    crew = flight.crew
+    distance_km = flight.distance_km
 
     # 4️⃣ Rule-based risks
     technical_risk = compute_technical_risk(
@@ -110,7 +95,8 @@ def main():
                 "delay": flight.scheduled_delay_min,
                 "carbon": carbon_emission,
                 "technical_risk": overall_operational_risk,
-                "crew_compliance": 1 if crew.duty_hours_today < crew.max_duty_hours else 0
+                "crew_compliance": 1 if crew.duty_hours_today < crew.max_duty_hours else 0,
+                "cancellation_impact": 0
             }
         },
         {
@@ -119,10 +105,16 @@ def main():
                 "delay": 0,
                 "carbon": 0,
                 "technical_risk": overall_operational_risk,
-                "crew_compliance": 1
+                "crew_compliance": 1,
+                "cancellation_impact":1
             }
         }
     ]
+
+    #Normalize parametres for fair weighted scoring
+    
+    for option in options:
+        option["normalized_parameters"] = normalize_parameters(option["parameters"])
 
     # 9️⃣ Decision
     decision = engine.recommend(options)
