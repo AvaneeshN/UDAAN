@@ -87,13 +87,8 @@ function App() {
 }
 
   function handleFlightSubmit(flightData) {
-    console.log("Submitted flight data:", flightData);
-
-    alert(
-      `Airline: ${flightData.airline_code}\n` +
-     `Flight: ${flightData.flight_id}`
-    );
-}
+    dispatch(createDecision(flightData));
+  }
 
   function handleGenerateDecision() {
     dispatch(createDecision(sampleFlightData));
@@ -110,8 +105,8 @@ function App() {
         onShowDetails={handleShowStatusDetails}
       />
       </section>
-      <FlightForm onSubmit={handleFlightSubmit} />
-
+      <FlightForm onSubmit={handleFlightSubmit} 
+      isSubmitting={status ==="loading"} />
       <section>
         <h2>Decision Engine Test</h2>
 
