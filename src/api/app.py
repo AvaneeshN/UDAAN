@@ -23,7 +23,7 @@ def create_decision(request_data: FlightDecisionRequest):
 
     result = generate_decision(
         raw=raw_data,
-        airline_code="indigo",
+        airline_code=airline_code,
     )
 
     return asdict(result)

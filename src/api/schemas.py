@@ -18,7 +18,7 @@ class AircraftInput(BaseModel):
 class CrewInput(BaseModel):
   crew_id: str
   duty_hours_today: float = Field(ge = 0)
-  max_duty_hours: float = Field(ge = 0)
+  max_duty_hours: float = Field(gt = 0)
 
 class FlightHistoryInput(BaseModel):
     past_delays: int = Field(ge=0)
