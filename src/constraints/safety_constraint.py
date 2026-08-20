@@ -6,7 +6,7 @@ class SafetyRiskConstraint(BaseConstraint):
 
     def is_allowed(self, option: dict) -> bool:
         #cancellation does not operate the aircraft
-        if option.get("action") == "cancel_f;light":
+        if option.get("action") == "cancel_flight":
             return True
         risk = option["parameters"].get("technical_risk", 0)
 
