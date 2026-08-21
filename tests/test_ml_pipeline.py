@@ -1,10 +1,22 @@
 import numpy as np
 import pytest
+import sklearn
 
 from ml.features import FEATURE_NAMES, extract_features
+from ml.model_contract import MODEL_SCHEMA_VERSION
 from ml.risk_model import MLRiskPredictor
 from models.factory import build_flight_from_json
 from services import decision_service
+
+
+def model_artifact(model):
+    return {
+        "schema_version": MODEL_SCHEMA_VERSION,
+        "feature_names": FEATURE_NAMES,
+        "sklearn_version": sklearn.__version__,
+        "training_data_source": "test_fixture",
+        "model": model,
+    }
 
 
 @pytest.fixture
@@ -104,6 +116,8 @@ def test_default_model_path_is_independent_of_working_directory(
     predictor = MLRiskPredictor()
 
     assert predictor.model.n_features_in_ == len(FEATURE_NAMES)
+    assert predictor.metadata["schema_version"] == MODEL_SCHEMA_VERSION
+    assert predictor.metadata["training_data_source"] == "synthetic_demo"
 
 
 @pytest.mark.parametrize(
@@ -145,7 +159,7 @@ def test_predictor_uses_the_disruption_class_by_label(monkeypatch):
 
     monkeypatch.setattr(
         "ml.risk_model.joblib.load",
-        lambda _path: ReversedClassModel(),
+        lambda _path: model_artifact(ReversedClassModel()),
     )
 
     predictor = MLRiskPredictor("unused.pkl")
@@ -163,8 +177,27 @@ def test_predictor_rejects_an_incompatible_model(monkeypatch):
 
     monkeypatch.setattr(
         "ml.risk_model.joblib.load",
-        lambda _path: IncompatibleModel(),
+        lambda _path: model_artifact(IncompatibleModel()),
     )
 
     with pytest.raises(ValueError, match="incompatible number of features"):
+        MLRiskPredictor("unused.pkl")
+
+
+def test_predictor_rejects_mismatched_artifact_feature_names(monkeypatch):
+    class CompatibleShapeModel:
+        n_features_in_ = len(FEATURE_NAMES)
+        classes_ = np.array([0, 1])
+
+        def predict_proba(self, _features):
+            return np.array([[0.5, 0.5]])
+
+    artifact = model_artifact(CompatibleShapeModel())
+    artifact["feature_names"] = tuple(reversed(FEATURE_NAMES))
+    monkeypatch.setattr(
+        "ml.risk_model.joblib.load",
+        lambda _path: artifact,
+    )
+
+    with pytest.raises(ValueError, match="feature names do not match"):
         MLRiskPredictor("unused.pkl")

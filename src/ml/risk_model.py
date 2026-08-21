@@ -2,8 +2,13 @@ from pathlib import Path
 
 import joblib
 import numpy as np
+import sklearn
 
 from ml.features import FEATURE_NAMES
+from ml.model_contract import (
+    MODEL_SCHEMA_VERSION,
+    REQUIRED_ARTIFACT_KEYS,
+)
 
 
 DEFAULT_MODEL_PATH = Path(__file__).with_name("model.pkl")
@@ -12,8 +17,46 @@ DEFAULT_MODEL_PATH = Path(__file__).with_name("model.pkl")
 class MLRiskPredictor:
     def __init__(self, model_path: str | Path | None = None):
         resolved_path = Path(model_path) if model_path else DEFAULT_MODEL_PATH
-        self.model = joblib.load(resolved_path)
+        artifact = joblib.load(resolved_path)
+        self.model, self.metadata = self._load_artifact(artifact)
         self._validate_model()
+
+    @staticmethod
+    def _load_artifact(artifact: object) -> tuple[object, dict]:
+        if not isinstance(artifact, dict):
+            raise ValueError("ML model artifact must be a metadata dictionary")
+
+        missing_keys = REQUIRED_ARTIFACT_KEYS - artifact.keys()
+        if missing_keys:
+            missing = ", ".join(sorted(missing_keys))
+            raise ValueError(f"ML model artifact is missing: {missing}")
+
+        if artifact["schema_version"] != MODEL_SCHEMA_VERSION:
+            raise ValueError(
+                "Unsupported ML model schema version: "
+                f"{artifact['schema_version']}"
+            )
+        if tuple(artifact["feature_names"]) != FEATURE_NAMES:
+            raise ValueError(
+                "ML model feature names do not match the inference contract"
+            )
+        if artifact["sklearn_version"] != sklearn.__version__:
+            raise ValueError(
+                "ML model requires scikit-learn "
+                f"{artifact['sklearn_version']}; running "
+                f"{sklearn.__version__}"
+            )
+        if not artifact["training_data_source"]:
+            raise ValueError(
+                "ML model artifact must identify its training data source"
+            )
+
+        metadata = {
+            key: value
+            for key, value in artifact.items()
+            if key != "model"
+        }
+        return artifact["model"], metadata
 
     def _validate_model(self) -> None:
         if not hasattr(self.model, "predict_proba"):
