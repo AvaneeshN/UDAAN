@@ -1,14 +1,13 @@
 from datetime import datetime, timezone
 import os
 
-import numpy as np
-
 from carbon_model.carbon_estimator import CarbonEstimator
 from constraints.carbon_constraint import CarbonConstraint
 from constraints.crew_constraint import CrewDutyConstraint
 from constraints.safety_constraint import SafetyRiskConstraint
 from decision_engine.engine import DecisionEngine
 from explainability.explainer import DecisionExplainer
+from ml.features import extract_features
 from ml.risk_model import MLRiskPredictor
 from models.decision_result import DecisionResult
 from models.factory import build_flight_from_json
@@ -82,16 +81,7 @@ def generate_decision(
     # 5. Calculate ML risk
     ml_predictor = MLRiskPredictor()
 
-    ml_features = np.array([
-        aircraft.age_years,
-        aircraft.technical_failure_rate,
-        aircraft.avg_tech_delay_min,
-        raw["history"]["past_delays"],
-        raw["history"]["past_cancellations"],
-        raw["history"]["technical_cancellations"],
-        crew.duty_hours_today / crew.max_duty_hours,
-        flight.scheduled_delay_min,
-    ])
+    ml_features = extract_features(flight, raw["history"])
 
     ml_risk = ml_predictor.predict_risk(ml_features)
 
