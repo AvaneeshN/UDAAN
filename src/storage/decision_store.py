@@ -1,6 +1,5 @@
 import sqlite3
 import json
-from pathlib import Path
 
 class DecisionStore:
     def __init__(self, db_path="decision_history.db"):
