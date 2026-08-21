@@ -1,75 +1,121 @@
+from math import isclose, isfinite
+from numbers import Real
+
+
 class DecisionEngine:
-    def __init__(self, weights: dict, constraints: list = None):
-        self.weights = weights
+    def __init__(self, weights: dict, constraints: list | None = None):
+        self.weights = self._validate_weights(weights)
         self.constraints = constraints or []
 
+    @staticmethod
+    def _validate_weights(weights: dict) -> dict:
+        if not weights:
+            raise ValueError("Decision weights must not be empty")
+
+        validated = {}
+        for parameter_name, weight in weights.items():
+            if (
+                not isinstance(weight, Real)
+                or isinstance(weight, bool)
+                or not isfinite(weight)
+                or weight < 0
+            ):
+                raise ValueError(
+                    f"Weight for '{parameter_name}' must be a finite, "
+                    "non-negative number"
+                )
+            validated[parameter_name] = float(weight)
+
+        if not isclose(
+            sum(validated.values()),
+            1.0,
+            rel_tol=1e-9,
+            abs_tol=1e-9,
+        ):
+            raise ValueError("Decision weights must sum to 1.0")
+
+        return validated
+
     def score_option(self, normalized_parameters: dict) -> float:
-        """
-        normalized_parameters: values for each factor (normalized to 0-1)
-        example:
-        {
-            'delay': 0.5,
-            'carbon': 0.8,
-            'technical_risk': 0.3,
-            'crew_compliance': 1.0
-        }
-        """
+        missing_parameters = self.weights.keys() - normalized_parameters.keys()
+        if missing_parameters:
+            missing = ", ".join(sorted(missing_parameters))
+            raise ValueError(
+                f"Missing normalized decision parameters: {missing}"
+            )
+
         score = 0.0
         for parameter_name, weight in self.weights.items():
-            normalized_value = normalized_parameters.get(parameter_name , 0)
+            normalized_value = normalized_parameters[parameter_name]
+            if (
+                not isinstance(normalized_value, Real)
+                or isinstance(normalized_value, bool)
+                or not isfinite(normalized_value)
+                or not 0 <= normalized_value <= 1
+            ):
+                raise ValueError(
+                    f"Normalized value for '{parameter_name}' must be "
+                    "between 0 and 1"
+                )
             score += weight * normalized_value
+
         return score
 
     def _normalize_scores(self, scored: list) -> list:
-        """
-        scored: list of (action, raw_score)
-        returns: list of (action, normalized_score)
-        """
         scores = [score for _, score in scored]
-        min_score = min(scores)
-        max_score = max(scores)
+        minimum_score = min(scores)
+        maximum_score = max(scores)
 
-        if max_score == min_score:
+        if maximum_score == minimum_score:
             return [(action, 0.0) for action, _ in scored]
 
-        normalized = []
-        for action, score in scored:
-            norm = (score - min_score) / (max_score - min_score)
-            normalized.append((action, round(norm, 3)))
-
-        return normalized
+        return [
+            (
+                action,
+                round(
+                    (score - minimum_score)
+                    / (maximum_score - minimum_score),
+                    3,
+                ),
+            )
+            for action, score in scored
+        ]
 
     def recommend(self, options: list) -> dict:
-        valid_options = []
+        if not options:
+            raise ValueError("At least one decision option is required")
 
-        # 1️⃣ Apply constraints FIRST
-        for option in options:
-            if all(c.is_allowed(option) for c in self.constraints):
-                valid_options.append(option)
+        valid_options = [
+            option
+            for option in options
+            if all(
+                constraint.is_allowed(option)
+                for constraint in self.constraints
+            )
+        ]
 
         if not valid_options:
             return {
                 "recommended_action": None,
                 "normalized_scores": [],
-                "raw_scores":[],
-                "reason": "All options violate constraints"
+                "raw_scores": [],
+                "reason": "All options violate constraints",
             }
 
-        # 2️⃣ Score valid options
-        scored = []
-        for option in valid_options:
-            score = self.score_option(option["normalized_parameters"])
-            scored.append((option["action"], score))
-
-        # 3️⃣ Normalize scores
+        scored = [
+            (
+                option["action"],
+                self.score_option(option["normalized_parameters"]),
+            )
+            for option in valid_options
+        ]
         normalized = self._normalize_scores(scored)
 
-        # 4️⃣ Choose best option
-        recommended_action = min(normalized, key=lambda x: x[1])[0]
+        recommended_action = min(scored, key=lambda item: item[1])[0]
 
         return {
             "recommended_action": recommended_action,
             "normalized_scores": normalized,
             "raw_scores": scored,
-            "reason": None
+            "reason": None,
         }
