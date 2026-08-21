@@ -3,6 +3,56 @@ import { apiUrl } from "../../config/api";
 
 const DECISION_API_URL = apiUrl("/api/decisions");
 
+async function readResponseBody(response) {
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    try {
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  const text = await response.text();
+  return text.trim() || null;
+}
+
+function formatApiError(data, response) {
+  if (Array.isArray(data?.detail)) {
+    return data.detail
+      .map((validationError) => {
+        const location = Array.isArray(validationError.loc)
+          ? validationError.loc.join(".")
+          : "request";
+        const message = validationError.msg || "Invalid value";
+
+        return `${location}: ${message}`;
+      })
+      .join(", ");
+  }
+
+  if (typeof data?.detail === "string") {
+    return data.detail;
+  }
+
+  if (typeof data?.message === "string") {
+    return data.message;
+  }
+
+  if (typeof data === "string") {
+    return data;
+  }
+
+  const status = [response.status, response.statusText]
+    .filter(Boolean)
+    .join(" ");
+
+  return status
+    ? `Unable to generate decision (${status})`
+    : "Unable to generate decision";
+}
+
 
 export const createDecision = createAsyncThunk(
   "decision/createDecision",
@@ -17,21 +67,10 @@ export const createDecision = createAsyncThunk(
         body: JSON.stringify(flightData),
       });
 
-      const data = await response.json();
+      const data = await readResponseBody(response);
 
       if (!response.ok) {
-        const errorMessage = Array.isArray(data.detail)
-          ? data.detail
-              .map(
-                (validationError) =>
-                  `${validationError.loc.join(".")}: ${
-                    validationError.msg
-                  }`
-              )
-              .join(", ")
-          : data.detail || "Unable to generate decision";
-
-        return rejectWithValue(errorMessage);
+        return rejectWithValue(formatApiError(data, response));
       }
 
       return data;
