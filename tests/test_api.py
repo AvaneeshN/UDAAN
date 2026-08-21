@@ -77,6 +77,24 @@ def test_decision_endpoint_passes_selected_airline(monkeypatch, flight_payload):
     assert response.json() == {"flight_id": "AI-101"}
 
 
+def test_decision_endpoint_runs_the_complete_pipeline(flight_payload):
+    response = client.post("/api/decisions", json=flight_payload)
+
+    assert response.status_code == 200
+    decision = response.json()
+    explanation = decision["explanation"]
+
+    assert decision["flight_id"] == "AI-101"
+    assert decision["recommended_action"] in {
+        "delay_flight",
+        "cancel_flight",
+    }
+    assert decision["raw_scores"]
+    assert 0 <= explanation["ml_risk"] <= 1
+    assert 0 <= explanation["rule_based_risk"] <= 1
+    assert 0 <= explanation["overall_operational_risk"] <= 1
+
+
 @pytest.mark.parametrize("invalid_limit", [0, -1])
 def test_max_duty_hours_must_be_positive(flight_payload, invalid_limit):
     flight_payload["crew"]["max_duty_hours"] = invalid_limit
