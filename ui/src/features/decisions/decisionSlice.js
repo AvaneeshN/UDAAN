@@ -1,7 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import { apiUrl } from "../../config/api";
 
-const DECISION_API_URL =
-  "http://127.0.0.1:8000/api/decisions";
+const DECISION_API_URL = apiUrl("/api/decisions");
 
 
 export const createDecision = createAsyncThunk(
