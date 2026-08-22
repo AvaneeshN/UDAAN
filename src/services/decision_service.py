@@ -1,15 +1,15 @@
 from datetime import datetime, timezone
 import os
 
-import numpy as np
-
 from carbon_model.carbon_estimator import CarbonEstimator
 from constraints.carbon_constraint import CarbonConstraint
 from constraints.crew_constraint import CrewDutyConstraint
 from constraints.safety_constraint import SafetyRiskConstraint
 from decision_engine.engine import DecisionEngine
 from explainability.explainer import DecisionExplainer
+from ml.features import extract_features
 from ml.risk_model import MLRiskPredictor
+from models.crew import Crew
 from models.decision_result import DecisionResult
 from models.factory import build_flight_from_json
 from normalization.parameter_normalizer import normalize_parameters
@@ -21,6 +21,13 @@ from technical_risk.technical_risk import compute_technical_risk
 
 
 SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def crew_can_absorb_delay(crew: Crew, delay_minutes: int) -> bool:
+    projected_duty_hours = (
+        crew.duty_hours_today + delay_minutes / 60
+    )
+    return projected_duty_hours <= crew.max_duty_hours
 
 
 def generate_decision(
@@ -82,16 +89,7 @@ def generate_decision(
     # 5. Calculate ML risk
     ml_predictor = MLRiskPredictor()
 
-    ml_features = np.array([
-        aircraft.age_years,
-        aircraft.technical_failure_rate,
-        aircraft.avg_tech_delay_min,
-        raw["history"]["past_delays"],
-        raw["history"]["past_cancellations"],
-        raw["history"]["technical_cancellations"],
-        crew.duty_hours_today / crew.max_duty_hours,
-        flight.scheduled_delay_min,
-    ])
+    ml_features = extract_features(flight, raw["history"])
 
     ml_risk = ml_predictor.predict_risk(ml_features)
 
@@ -116,7 +114,10 @@ def generate_decision(
                 "technical_risk": overall_operational_risk,
                 "crew_compliance": (
                     1
-                    if crew.duty_hours_today < crew.max_duty_hours
+                    if crew_can_absorb_delay(
+                        crew,
+                        flight.scheduled_delay_min,
+                    )
                     else 0
                 ),
                 "cancellation_impact": 0,

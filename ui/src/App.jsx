@@ -6,6 +6,7 @@ import {
   clearDecision,
   createDecision,
 } from "./features/decisions/decisionSlice";
+import { apiUrl } from "./config/api";
 
 import "./App.css";
 
@@ -64,9 +65,7 @@ function App() {
   useEffect(() => {
     async function checkBackend() {
       try {
-        const response = await fetch(
-          "http://127.0.0.1:8000/api/health"
-        );
+        const response = await fetch(apiUrl("/api/health"));
 
         if (!response.ok) {
           throw new Error("Health check failed");

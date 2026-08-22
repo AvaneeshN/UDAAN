@@ -75,7 +75,7 @@ function FlightForm({ onSubmit, isSubmitting = false }) {
       },
       aircraft: {
         aircraft_id: formData.aircraft.aircraft_id.trim(),
-        aircraft_type: formData.aircraft.aircraft.aircraft_type.trim(),
+        aircraft_type: formData.aircraft.aircraft_type.trim(),
         age_years: Number(formData.aircraft.age_years),
         emission_factor: Number(formData.aircraft.emission_factor),
         technical_failure_rate: Number(formData.aircraft.technical_failure_rate),
@@ -119,12 +119,13 @@ function FlightForm({ onSubmit, isSubmitting = false }) {
     formData.destination.name.trim()
   )
   const isAircraftDataComplete = Boolean(
-    formData.aircraft.aircraft_id.trim() &&
+  formData.aircraft.aircraft_id.trim() &&
     formData.aircraft.aircraft_type.trim() &&
     formData.aircraft.age_years !== "" &&
-    formData.aircraft.emission_factor !=="" &&
+    formData.aircraft.emission_factor !== "" &&
     formData.aircraft.technical_failure_rate !== "" &&
-    formData.aircraft.avg_tech_delay_min !==""  )  
+    formData.aircraft.avg_tech_delay_min !== ""
+);
   const isCrewDataComplete = Boolean(
     formData.crew.crew_id.trim() &&
     formData.crew.duty_hours_today !== "" &&
