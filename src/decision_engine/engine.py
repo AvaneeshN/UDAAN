@@ -13,6 +13,7 @@ class DecisionEngine:
             raise ValueError("Decision weights must not be empty")
 
         validated = {}
+        # the bool check is necessary because python considers bool a subclass of int
         for parameter_name, weight in weights.items():
             if (
                 not isinstance(weight, Real)
