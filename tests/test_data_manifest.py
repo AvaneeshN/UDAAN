@@ -8,18 +8,11 @@ from ml.data_manifest import ManifestError, load_bts_manifest
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-COMMITTED_MANIFEST_PATH = (
-    REPOSITORY_ROOT
-    / "data"
-    / "manifests"
-    / "bts_baseline.json"
-)
+COMMITTED_MANIFEST_PATH = REPOSITORY_ROOT / "data" / "manifests" / "bts_baseline.json"
 
 
 def committed_manifest_data() -> dict:
-    return json.loads(
-        COMMITTED_MANIFEST_PATH.read_text(encoding="utf-8")
-    )
+    return json.loads(COMMITTED_MANIFEST_PATH.read_text(encoding="utf-8"))
 
 
 def write_manifest(tmp_path: Path, data: object) -> Path:
@@ -34,10 +27,7 @@ def write_manifest(tmp_path: Path, data: object) -> Path:
 def test_loads_committed_bts_manifest():
     manifest = load_bts_manifest()
 
-    assert (
-        manifest.dataset_id
-        == "bts_reporting_carrier_on_time_performance"
-    )
+    assert manifest.dataset_id == "bts_reporting_carrier_on_time_performance"
     assert manifest.scope.training.start_date == date(2022, 1, 1)
     assert manifest.scope.test.end_date == date(2025, 12, 31)
     assert "FlightDate" in manifest.required_columns
@@ -105,13 +95,80 @@ def test_rejects_unsafe_storage_path(tmp_path):
 
 def test_rejects_duplicate_raw_columns(tmp_path):
     data = committed_manifest_data()
-    data["raw_columns"]["scheduled_information"].append(
-        "FlightDate"
-    )
+    data["raw_columns"]["scheduled_information"].append("FlightDate")
     manifest_path = write_manifest(tmp_path, data)
 
     with pytest.raises(
         ManifestError,
         match="must not contain duplicate columns",
+    ):
+        load_bts_manifest(manifest_path)
+
+
+def test_development_sample_uses_approved_bts_zip():
+    manifest = load_bts_manifest()
+
+    assert (
+        str(manifest.source.development_sample_url)
+        == "https://transtats.bts.gov/PREZIP/"
+        "On_Time_Reporting_Carrier_On_Time_Performance_"
+        "1987_present_2022_1.zip"
+    )
+
+
+def test_rejects_insecure_development_sample_url(tmp_path):
+    data = committed_manifest_data()
+    data["source"]["development_sample_url"] = (
+        "http://transtats.bts.gov/PREZIP/sample.zip"
+    )
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="must use HTTPS",
+    ):
+        load_bts_manifest(manifest_path)
+
+
+def test_rejects_unapproved_download_host(tmp_path):
+    data = committed_manifest_data()
+    data["source"]["development_sample_url"] = "https://example.com/PREZIP/sample.zip"
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="approved BTS host",
+    ):
+        load_bts_manifest(manifest_path)
+
+
+def test_rejects_download_url_for_wrong_month(tmp_path):
+    data = committed_manifest_data()
+    data["source"]["development_sample_url"] = (
+        "https://transtats.bts.gov/PREZIP/"
+        "On_Time_Reporting_Carrier_On_Time_Performance_"
+        "1987_present_2022_2.zip"
+    )
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="reporting-carrier development sample month",
+    ):
+        load_bts_manifest(manifest_path)
+
+
+def test_rejects_different_bts_dataset(tmp_path):
+    data = committed_manifest_data()
+    data["source"]["development_sample_url"] = (
+        "https://transtats.bts.gov/PREZIP/"
+        "On_Time_Marketing_Carrier_On_Time_Performance_"
+        "Beginning_January_2018_2022_1.zip"
+    )
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="reporting-carrier development sample month",
     ):
         load_bts_manifest(manifest_path)

@@ -8,6 +8,7 @@
     "table_name": "Reporting Carrier On-Time Performance (1987-present)",
     "landing_page": "https://www.transtats.bts.gov/TableInfo.asp?QO_fu146_anzr=b0-gvzr&gnoyr_VQ=FGJ",
     "download_page": "https://www.transtats.bts.gov/DL_SelectFields.aspx?QO_fu146_anzr=b0-gvzr&gnoyr_VQ=FGJ",
+    "development_sample_url": "https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_2022_1.zip",
     "field_documentation": "https://www.transtats.bts.gov/Fields.asp?gnoyr_VQ=FGJ",
     "delay_cause_documentation": "https://www.bts.gov/topics/airlines-and-airports/understanding-reporting-causes-flight-delays-and-cancellations",
     "accessed_at_utc": null
