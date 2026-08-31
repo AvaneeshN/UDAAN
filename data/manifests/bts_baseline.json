@@ -1,0 +1,107 @@
+{
+  "manifest_schema_version": 1,
+  "dataset_id": "bts_reporting_carrier_on_time_performance",
+  "dataset_status": "planned",
+  "description": "Flight-level United States domestic airline performance data for the UDAAN disruption-risk baseline.",
+  "source": {
+    "publisher": "United States Department of Transportation, Bureau of Transportation Statistics",
+    "table_name": "Reporting Carrier On-Time Performance (1987-present)",
+    "landing_page": "https://www.transtats.bts.gov/TableInfo.asp?QO_fu146_anzr=b0-gvzr&gnoyr_VQ=FGJ",
+    "download_page": "https://www.transtats.bts.gov/DL_SelectFields.aspx?QO_fu146_anzr=b0-gvzr&gnoyr_VQ=FGJ",
+    "development_sample_url": "https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_2022_1.zip",
+    "field_documentation": "https://www.transtats.bts.gov/Fields.asp?gnoyr_VQ=FGJ",
+    "delay_cause_documentation": "https://www.bts.gov/topics/airlines-and-airports/understanding-reporting-causes-flight-delays-and-cancellations",
+    "accessed_at_utc": null
+  },
+  "usage_review": {
+    "publicly_accessible": true,
+    "legal_review_status": "pending",
+    "commercial_model_training_reviewed": false,
+    "raw_data_redistribution_reviewed": false
+  },
+  "storage": {
+    "raw_directory": "data/raw/bts",
+    "interim_directory": "data/interim/bts",
+    "processed_directory": "data/processed/bts",
+    "raw_and_generated_data_tracked_by_git": false
+  },
+  "scope": {
+    "row_unit": "one scheduled nonstop flight segment",
+    "development_sample": {
+      "start_date": "2022-01-01",
+      "end_date": "2022-01-31"
+    },
+    "training": {
+      "start_date": "2022-01-01",
+      "end_date": "2024-06-30"
+    },
+    "validation": {
+      "start_date": "2024-07-01",
+      "end_date": "2024-12-31"
+    },
+    "test": {
+      "start_date": "2025-01-01",
+      "end_date": "2025-12-31"
+    }
+  },
+  "raw_columns": {
+    "flight_identity": [
+      "FlightDate",
+      "Reporting_Airline",
+      "DOT_ID_Reporting_Airline",
+      "Flight_Number_Reporting_Airline",
+      "Tail_Number",
+      "OriginAirportID",
+      "Origin",
+      "DestAirportID",
+      "Dest"
+    ],
+    "scheduled_information": [
+      "Year",
+      "Quarter",
+      "Month",
+      "DayofMonth",
+      "DayOfWeek",
+      "CRSDepTime",
+      "CRSArrTime",
+      "CRSElapsedTime",
+      "Distance",
+      "DistanceGroup"
+    ],
+    "outcome_information": [
+      "DepDelayMinutes",
+      "ArrDelayMinutes",
+      "Cancelled",
+      "Diverted",
+      "CancellationCode",
+      "CarrierDelay",
+      "WeatherDelay",
+      "NASDelay",
+      "SecurityDelay",
+      "LateAircraftDelay"
+    ]
+  },
+  "target": {
+    "name": "significant_disruption",
+    "type": "binary",
+    "positive_class": 1,
+    "negative_class": 0,
+    "delay_threshold_minutes": 15,
+    "positive_when_any": [
+      "Cancelled == 1",
+      "Diverted == 1",
+      "ArrDelayMinutes >= 15"
+    ]
+  },
+  "integrity": {
+    "checksum_algorithm": "sha256",
+    "downloaded_files": []
+  },
+  "limitations": [
+    "The data represents reporting United States domestic airline operations.",
+    "BTS scheduled fields are not versioned snapshots from exactly 24 hours before departure.",
+    "Tail_Number may not represent an aircraft assignment known at the prediction cutoff.",
+    "Air Carrier delay causes combine maintenance, crew, baggage, fueling, and other airline-controlled causes.",
+    "Crew-duty and detailed maintenance information are not present."
+  ]
+}
