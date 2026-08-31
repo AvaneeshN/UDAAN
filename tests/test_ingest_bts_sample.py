@@ -299,3 +299,28 @@ def test_debug_mode_reraises_unexpected_error(
         match="debugging details",
     ):
         cli.main(["--debug"])
+
+def test_keyboard_interrupt_is_reported_cleanly(
+    monkeypatch,
+    capsys,
+):
+    def interrupted_ingestion(**kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(
+        cli,
+        "ingest_bts_development_sample",
+        interrupted_ingestion,
+    )
+
+    exit_code = cli.main(["--execute"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.err)
+
+    assert exit_code == cli.EXIT_INTERRUPTED
+    assert captured.out == ""
+    assert payload["status"] == "cancelled"
+    assert payload["stage"] == "ingestion"
+    assert payload["archive_retained"] is False
+    assert "Traceback" not in captured.err

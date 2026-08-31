@@ -30,7 +30,7 @@ EXIT_SUCCESS = 0
 EXIT_OPERATIONAL_ERROR = 1
 EXIT_PROVENANCE_ERROR = 3
 EXIT_INTERNAL_ERROR = 70
-
+EXIT_INTERRUPTED = 130
 
 def _positive_integer(value: str) -> int:
     try:
@@ -193,6 +193,19 @@ def _run_command(
                 args.max_download_bytes
             ),
         )
+    except KeyboardInterrupt:
+        _write_json(
+            {
+                "status": "cancelled",
+                "stage": "ingestion",
+                "message": (
+                    "BTS ingestion was interrupted by the user"
+                ),
+                "archive_retained": False,
+            },
+            sys.stderr,
+        )
+        return EXIT_INTERRUPTED
     except (BTSIngestionError, ManifestError) as exc:
         _write_json(
             {
