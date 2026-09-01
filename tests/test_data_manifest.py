@@ -14,6 +14,25 @@ COMMITTED_MANIFEST_PATH = REPOSITORY_ROOT / "data" / "manifests" / "bts_baseline
 def committed_manifest_data() -> dict:
     return json.loads(COMMITTED_MANIFEST_PATH.read_text(encoding="utf-8"))
 
+def planned_manifest_data() -> dict:
+    data = committed_manifest_data()
+    data["dataset_status"] = "planned"
+    data["source"]["accessed_at_utc"] = None
+    data["integrity"]["downloaded_files"] = []
+
+    return data
+
+
+def sample_download_record() -> dict:
+    return {
+        "filename": "sample.zip",
+        "source_url": (
+            "https://transtats.bts.gov/PREZIP/sample.zip"
+        ),
+        "retrieved_at_utc": "2026-09-01T13:21:40Z",
+        "size_bytes": 100,
+        "sha256": "a" * 64,
+    }
 
 def write_manifest(tmp_path: Path, data: object) -> Path:
     manifest_path = tmp_path / "manifest.json"
@@ -32,8 +51,125 @@ def test_loads_committed_bts_manifest():
     assert manifest.scope.test.end_date == date(2025, 12, 31)
     assert "FlightDate" in manifest.required_columns
     assert "ArrDelayMinutes" in manifest.required_columns
+    if manifest.dataset_status == "planned":
+        assert manifest.source.accessed_at_utc is None
+        assert manifest.integrity.downloaded_files == ()
+    else:
+        assert manifest.source.accessed_at_utc is not None
+        assert manifest.integrity.downloaded_files
+
+def test_accepts_planned_lifecycle_state(tmp_path):
+    manifest_path = write_manifest(
+        tmp_path,
+        planned_manifest_data(),
+    )
+
+    manifest = load_bts_manifest(manifest_path)
+
+    assert manifest.dataset_status == "planned"
+    assert manifest.source.accessed_at_utc is None
     assert manifest.integrity.downloaded_files == ()
 
+
+@pytest.mark.parametrize(
+    "dataset_status",
+    ["downloaded", "validated"],
+)
+def test_accepts_recorded_lifecycle_state(
+    tmp_path,
+    dataset_status,
+):
+    data = planned_manifest_data()
+    record = sample_download_record()
+
+    data["dataset_status"] = dataset_status
+    data["source"]["accessed_at_utc"] = (
+        record["retrieved_at_utc"]
+    )
+    data["integrity"]["downloaded_files"] = [record]
+
+    manifest_path = write_manifest(tmp_path, data)
+    manifest = load_bts_manifest(manifest_path)
+
+    assert manifest.dataset_status == dataset_status
+    assert manifest.source.accessed_at_utc is not None
+    assert len(manifest.integrity.downloaded_files) == 1
+
+
+def test_rejects_planned_state_with_access_time(
+    tmp_path,
+):
+    data = planned_manifest_data()
+    data["source"]["accessed_at_utc"] = (
+        "2026-09-01T13:21:40Z"
+    )
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="planned dataset must not contain",
+    ):
+        load_bts_manifest(manifest_path)
+
+
+def test_rejects_planned_state_with_download_record(
+    tmp_path,
+):
+    data = planned_manifest_data()
+    data["integrity"]["downloaded_files"] = [
+        sample_download_record()
+    ]
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="planned dataset must not contain",
+    ):
+        load_bts_manifest(manifest_path)
+
+
+@pytest.mark.parametrize(
+    "dataset_status",
+    ["downloaded", "validated"],
+)
+def test_rejects_recorded_state_without_file(
+    tmp_path,
+    dataset_status,
+):
+    data = planned_manifest_data()
+    data["dataset_status"] = dataset_status
+    data["source"]["accessed_at_utc"] = (
+        "2026-09-01T13:21:40Z"
+    )
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="must contain at least one downloaded file",
+    ):
+        load_bts_manifest(manifest_path)
+
+
+@pytest.mark.parametrize(
+    "dataset_status",
+    ["downloaded", "validated"],
+)
+def test_rejects_recorded_state_without_access_time(
+    tmp_path,
+    dataset_status,
+):
+    data = planned_manifest_data()
+    data["dataset_status"] = dataset_status
+    data["integrity"]["downloaded_files"] = [
+        sample_download_record()
+    ]
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="must include accessed_at_utc",
+    ):
+        load_bts_manifest(manifest_path)
 
 def test_default_manifest_path_is_independent_of_working_directory(
     monkeypatch,

@@ -3,7 +3,6 @@ from dataclasses import replace as dataclass_replace
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
-from shutil import copyfile
 
 import pytest
 
@@ -41,9 +40,27 @@ def prepare_environment(
     manifest_path = (
         manifest_directory / "bts_baseline.json"
     )
-    copyfile(
-        DEFAULT_MANIFEST_PATH,
-        manifest_path,
+    manifest_document = json.loads(
+        DEFAULT_MANIFEST_PATH.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    manifest_document["dataset_status"] = "planned"
+    manifest_document["source"][
+        "accessed_at_utc"
+    ] = None
+    manifest_document["integrity"][
+        "downloaded_files"
+    ] = []
+
+    manifest_path.write_text(
+        json.dumps(
+            manifest_document,
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
     )
 
     manifest = load_bts_manifest(manifest_path)
@@ -72,7 +89,11 @@ def prepare_environment(
         sha256=sha256(
             ARCHIVE_CONTENTS
         ).hexdigest(),
-        csv_member_name="bts_sample.csv",
+        csv_member_name=(
+        "On_Time_Reporting_Carrier_"
+        "On_Time_Performance_"
+        "(1987_present)_2022_1.csv"
+    ),
         csv_size_bytes=100,
         columns=manifest.required_columns,
     )

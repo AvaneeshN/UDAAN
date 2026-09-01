@@ -211,6 +211,38 @@ class BTSManifest(StrictManifestModel):
             )
         return value
 
+    @model_validator(mode="after")
+    def validate_lifecycle_state(self) -> Self:
+        has_downloaded_files = bool(
+            self.integrity.downloaded_files
+        )
+        has_access_time = (
+            self.source.accessed_at_utc is not None
+        )
+
+        if self.dataset_status == "planned":
+            if has_downloaded_files or has_access_time:
+                raise ValueError(
+                    "planned dataset must not contain "
+                    "download provenance"
+                )
+
+            return self
+
+        if not has_downloaded_files:
+            raise ValueError(
+                f"{self.dataset_status} dataset must contain "
+                "at least one downloaded file"
+            )
+
+        if not has_access_time:
+            raise ValueError(
+                f"{self.dataset_status} dataset must include "
+                "accessed_at_utc"
+            )
+
+        return self
+
     @property
     def required_columns(self) -> tuple[str, ...]:
         return self.raw_columns.all_columns
