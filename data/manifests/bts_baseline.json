@@ -1,7 +1,7 @@
 {
   "manifest_schema_version": 1,
   "dataset_id": "bts_reporting_carrier_on_time_performance",
-  "dataset_status": "planned",
+  "dataset_status": "downloaded",
   "description": "Flight-level United States domestic airline performance data for the UDAAN disruption-risk baseline.",
   "source": {
     "publisher": "United States Department of Transportation, Bureau of Transportation Statistics",
@@ -11,7 +11,7 @@
     "development_sample_url": "https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_2022_1.zip",
     "field_documentation": "https://www.transtats.bts.gov/Fields.asp?gnoyr_VQ=FGJ",
     "delay_cause_documentation": "https://www.bts.gov/topics/airlines-and-airports/understanding-reporting-causes-flight-delays-and-cancellations",
-    "accessed_at_utc": null
+    "accessed_at_utc": "2026-09-01T13:21:40.454181Z"
   },
   "usage_review": {
     "publicly_accessible": true,
@@ -95,7 +95,15 @@
   },
   "integrity": {
     "checksum_algorithm": "sha256",
-    "downloaded_files": []
+    "downloaded_files": [
+      {
+        "filename": "On_Time_Reporting_Carrier_On_Time_Performance_1987_present_2022_1.zip",
+        "source_url": "https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_2022_1.zip",
+        "retrieved_at_utc": "2026-09-01T13:21:40.454181Z",
+        "size_bytes": 27656931,
+        "sha256": "ca1ae860eaa54f1f5dca6764ae594359bd13bee5a98a9e1d39082733e2fffeeb"
+      }
+    ]
   },
   "limitations": [
     "The data represents reporting United States domestic airline operations.",
