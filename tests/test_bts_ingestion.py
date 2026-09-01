@@ -17,6 +17,12 @@ from ml.data_manifest import load_bts_manifest
 MANIFEST = load_bts_manifest()
 REQUIRED_COLUMNS = MANIFEST.required_columns
 
+EXPECTED_CSV_MEMBER = (
+    "On_Time_Reporting_Carrier_"
+    "On_Time_Performance_"
+    "(1987_present)_2022_1.csv"
+)
+
 FIXED_TIME = datetime(
     2026,
     8,
@@ -43,8 +49,12 @@ def create_valid_zip() -> bytes:
         compression=ZIP_DEFLATED,
     ) as archive:
         archive.writestr(
-            "bts_sample.csv",
+            EXPECTED_CSV_MEMBER,
             csv_contents,
+        )
+        archive.writestr(
+            "readme.html",
+            b"<html>BTS documentation</html>",
         )
 
     return buffer.getvalue()
@@ -108,7 +118,7 @@ def test_ingests_validated_archive(tmp_path):
     assert result.sha256 == sha256(
         VALID_ZIP
     ).hexdigest()
-    assert result.csv_member_name == "bts_sample.csv"
+    assert result.csv_member_name == EXPECTED_CSV_MEMBER
     assert result.columns == REQUIRED_COLUMNS
     assert list(
         destination.parent.glob("*.part")

@@ -30,6 +30,12 @@ ALLOWED_COMPRESSION_METHODS = frozenset(
     }
 )
 
+ALLOWED_METADATA_MEMBER_NAMES = frozenset(
+    {
+        "readme.html",
+    }
+)
+
 
 class BTSArchiveError(RuntimeError):
     """Raised when a staged BTS archive is unsafe or invalid."""
@@ -114,6 +120,7 @@ def _validate_member_path(info: ZipInfo) -> None:
 def _inspect_members(
     archive: ZipFile,
     *,
+    expected_csv_member_name: str,
     max_members: int,
     max_uncompressed_bytes: int,
     max_compression_ratio: float,
@@ -172,16 +179,48 @@ def _inspect_members(
                     "BTS ZIP compression ratio exceeds the limit"
                 )
 
-    if (
-        len(files) != 1
-        or PurePosixPath(files[0].filename).suffix.lower()
-        != ".csv"
-    ):
+    csv_files = [
+        info
+        for info in files
+        if PurePosixPath(
+            info.filename
+        ).suffix.lower() == ".csv"
+    ]
+
+    if len(csv_files) != 1:
         raise BTSArchiveError(
             "BTS ZIP must contain exactly one CSV file"
         )
 
-    return files[0]
+    csv_info = csv_files[0]
+
+    if csv_info.filename != expected_csv_member_name:
+        raise BTSArchiveError(
+            "BTS ZIP contains an unexpected CSV member: "
+            f"{csv_info.filename}"
+        )
+
+    permitted_names = (
+        ALLOWED_METADATA_MEMBER_NAMES
+        | {expected_csv_member_name}
+    )
+
+    unexpected_members = sorted(
+        info.filename
+        for info in files
+        if info.filename not in permitted_names
+    )
+
+    if unexpected_members:
+        unexpected = ", ".join(
+            unexpected_members
+        )
+        raise BTSArchiveError(
+            f"BTS ZIP contains unexpected members: "
+            f"{unexpected}"
+        )
+
+    return csv_info
 
 
 def _read_and_validate_csv(
@@ -219,6 +258,11 @@ def _read_and_validate_csv(
             raise BTSArchiveError(
                 "BTS CSV header is invalid"
             ) from exc
+
+        # BTS PREZIP CSV files contain one trailing
+        # delimiter after the 109 documented fields.
+        if columns and columns[-1] == "":
+            columns = columns[:-1]
 
         if not columns or any(
             not column
@@ -311,6 +355,16 @@ def validate_bts_archive(
     manifest = load_bts_manifest(manifest_path)
     path = Path(archive_path)
 
+    sample = manifest.scope.development_sample
+
+    expected_csv_member_name = (
+        "On_Time_Reporting_Carrier_"
+        "On_Time_Performance_"
+        "(1987_present)_"
+        f"{sample.start_date.year}_"
+        f"{sample.start_date.month}.csv"
+    )
+
     if not path.is_file():
         raise BTSArchiveError(
             f"BTS archive does not exist: {path}"
@@ -322,6 +376,9 @@ def validate_bts_archive(
         with ZipFile(path, mode="r") as archive:
             csv_info = _inspect_members(
                 archive,
+                expected_csv_member_name=(
+                    expected_csv_member_name
+                ),
                 max_members=max_members,
                 max_uncompressed_bytes=(
                     max_uncompressed_bytes

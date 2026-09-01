@@ -12,6 +12,12 @@ from ml.data_manifest import load_bts_manifest
 
 REQUIRED_COLUMNS = load_bts_manifest().required_columns
 
+EXPECTED_CSV_MEMBER = (
+    "On_Time_Reporting_Carrier_"
+    "On_Time_Performance_"
+    "(1987_present)_2022_1.csv"
+)
+
 VALID_CSV = (
     ",".join(REQUIRED_COLUMNS)
     + "\n"
@@ -37,13 +43,13 @@ def test_validates_expected_bts_archive(tmp_path):
     archive_path = tmp_path / "sample.zip"
     write_archive(
         archive_path,
-        {"bts_sample.csv": VALID_CSV},
+        {EXPECTED_CSV_MEMBER: VALID_CSV},
     )
 
     result = validate_bts_archive(archive_path)
 
     assert result.archive_path == archive_path
-    assert result.csv_member_name == "bts_sample.csv"
+    assert result.csv_member_name == EXPECTED_CSV_MEMBER
     assert result.csv_size_bytes == len(VALID_CSV)
     assert result.columns == REQUIRED_COLUMNS
     assert (
@@ -81,7 +87,7 @@ def test_rejects_path_traversal(tmp_path):
 
 def test_rejects_symbolic_link(tmp_path):
     archive_path = tmp_path / "symlink.zip"
-    link_info = ZipInfo("bts_sample.csv")
+    link_info = ZipInfo(EXPECTED_CSV_MEMBER)
     link_info.create_system = 3
     link_info.external_attr = (
         stat.S_IFLNK | 0o777
@@ -134,7 +140,7 @@ def test_rejects_missing_required_columns(tmp_path):
 
     write_archive(
         archive_path,
-        {"bts_sample.csv": csv_contents},
+        {EXPECTED_CSV_MEMBER: csv_contents},
     )
 
     with pytest.raises(
@@ -163,7 +169,7 @@ def test_rejects_duplicate_columns(tmp_path):
 
     write_archive(
         archive_path,
-        {"bts_sample.csv": duplicate_header},
+        {EXPECTED_CSV_MEMBER: duplicate_header},
     )
 
     with pytest.raises(
@@ -179,7 +185,7 @@ def test_rejects_uncompressed_size_over_limit(
     archive_path = tmp_path / "oversized.zip"
     write_archive(
         archive_path,
-        {"bts_sample.csv": VALID_CSV},
+        {EXPECTED_CSV_MEMBER: VALID_CSV},
     )
 
     with pytest.raises(
@@ -204,7 +210,7 @@ def test_rejects_excessive_compression_ratio(
 
     write_archive(
         archive_path,
-        {"bts_sample.csv": compressible_contents},
+        {EXPECTED_CSV_MEMBER: compressible_contents},
     )
 
     with pytest.raises(
@@ -221,7 +227,7 @@ def test_rejects_header_over_limit(tmp_path):
     archive_path = tmp_path / "header.zip"
     write_archive(
         archive_path,
-        {"bts_sample.csv": VALID_CSV},
+        {EXPECTED_CSV_MEMBER: VALID_CSV},
     )
 
     with pytest.raises(
@@ -242,7 +248,7 @@ def test_rejects_too_many_archive_members(
         archive_path,
         {
             "folder/": b"",
-            "bts_sample.csv": VALID_CSV,
+            EXPECTED_CSV_MEMBER: VALID_CSV,
         },
     )
 
@@ -254,3 +260,118 @@ def test_rejects_too_many_archive_members(
             archive_path,
             max_members=1,
         )
+
+
+def test_allows_known_bts_readme(tmp_path):
+    archive_path = tmp_path / "with-readme.zip"
+
+    write_archive(
+        archive_path,
+        {
+            EXPECTED_CSV_MEMBER: VALID_CSV,
+            "readme.html": b"<html>BTS documentation</html>",
+        },
+    )
+
+    result = validate_bts_archive(archive_path)
+
+    assert (
+        result.csv_member_name
+        == EXPECTED_CSV_MEMBER
+    )
+
+
+def test_rejects_unexpected_additional_file(
+    tmp_path,
+):
+    archive_path = tmp_path / "unexpected.zip"
+
+    write_archive(
+        archive_path,
+        {
+            EXPECTED_CSV_MEMBER: VALID_CSV,
+            "notes.txt": b"unexpected content",
+        },
+    )
+
+    with pytest.raises(
+        BTSArchiveError,
+        match="unexpected members",
+    ):
+        validate_bts_archive(archive_path)
+
+
+def test_rejects_unexpected_csv_member_name(
+    tmp_path,
+):
+    archive_path = tmp_path / "wrong-name.zip"
+
+    write_archive(
+        archive_path,
+        {"different.csv": VALID_CSV},
+    )
+
+    with pytest.raises(
+        BTSArchiveError,
+        match="unexpected CSV member",
+    ):
+        validate_bts_archive(archive_path)
+
+
+def test_normalizes_one_trailing_blank_column(
+    tmp_path,
+):
+    archive_path = tmp_path / "trailing-column.zip"
+
+    csv_contents = (
+        ",".join(REQUIRED_COLUMNS)
+        + ",\n"
+        + ",".join(
+            "0"
+            for _ in REQUIRED_COLUMNS
+        )
+        + ",\n"
+    ).encode("utf-8")
+
+    write_archive(
+        archive_path,
+        {
+            EXPECTED_CSV_MEMBER: csv_contents,
+            "readme.html": b"<html>README</html>",
+        },
+    )
+
+    result = validate_bts_archive(archive_path)
+
+    assert result.columns == REQUIRED_COLUMNS
+    assert "" not in result.columns
+
+
+def test_rejects_blank_column_inside_header(
+    tmp_path,
+):
+    archive_path = tmp_path / "interior-blank.zip"
+
+    columns = list(REQUIRED_COLUMNS)
+    columns.insert(1, "")
+
+    csv_contents = (
+        ",".join(columns)
+        + "\n"
+        + ",".join(
+            "0"
+            for _ in columns
+        )
+        + "\n"
+    ).encode("utf-8")
+
+    write_archive(
+        archive_path,
+        {EXPECTED_CSV_MEMBER: csv_contents},
+    )
+
+    with pytest.raises(
+        BTSArchiveError,
+        match="empty column name",
+    ):
+        validate_bts_archive(archive_path)
