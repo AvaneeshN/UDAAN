@@ -16,7 +16,7 @@ from pydantic import (
 )
 
 
-SUPPORTED_MANIFEST_SCHEMA_VERSION = 1
+SUPPORTED_MANIFEST_SCHEMA_VERSION = 2
 DEFAULT_MANIFEST_PATH = (
     Path(__file__).resolve().parents[2] / "data" / "manifests" / "bts_baseline.json"
 )
@@ -172,6 +172,8 @@ class TargetDefinition(StrictManifestModel):
     negative_class: Literal[0]
     delay_threshold_minutes: int = Field(gt=0)
     positive_when_any: tuple[str, ...] = Field(min_length=1)
+    unresolved_when_any: tuple[str, ...] = Field(min_length=1)
+    unresolved_action: Literal["quarantine"]
 
 
 class DownloadedFile(StrictManifestModel):

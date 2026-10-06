@@ -1,5 +1,5 @@
 {
-  "manifest_schema_version": 1,
+  "manifest_schema_version": 2,
   "dataset_id": "bts_reporting_carrier_on_time_performance",
   "dataset_status": "downloaded",
   "description": "Flight-level United States domestic airline performance data for the UDAAN disruption-risk baseline.",
@@ -91,7 +91,13 @@
       "Cancelled == 1",
       "Diverted == 1",
       "ArrDelayMinutes >= 15"
-    ]
+    ],
+    "unresolved_when_any": [
+      "Cancelled is missing or not in {0, 1}",
+      "Diverted is missing or not in {0, 1}",
+      "Cancelled == 0 AND Diverted == 0 AND ArrDelayMinutes is missing"
+    ],
+    "unresolved_action": "quarantine"
   },
   "integrity": {
     "checksum_algorithm": "sha256",

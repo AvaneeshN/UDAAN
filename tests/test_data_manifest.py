@@ -58,6 +58,45 @@ def test_loads_committed_bts_manifest():
         assert manifest.source.accessed_at_utc is not None
         assert manifest.integrity.downloaded_files
 
+def test_committed_manifest_defines_unresolved_target_policy():
+    manifest = load_bts_manifest()
+
+    assert manifest.target.type == "binary"
+    assert manifest.target.delay_threshold_minutes == 15
+    assert manifest.target.unresolved_action == "quarantine"
+    assert manifest.target.unresolved_when_any == (
+        "Cancelled is missing or not in {0, 1}",
+        "Diverted is missing or not in {0, 1}",
+        (
+            "Cancelled == 0 AND Diverted == 0 AND "
+            "ArrDelayMinutes is missing"
+        ),
+    )
+
+
+def test_rejects_target_without_unresolved_action(tmp_path):
+    data = committed_manifest_data()
+    del data["target"]["unresolved_action"]
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="unresolved_action",
+    ):
+        load_bts_manifest(manifest_path)
+
+
+def test_rejects_empty_unresolved_target_conditions(tmp_path):
+    data = committed_manifest_data()
+    data["target"]["unresolved_when_any"] = []
+    manifest_path = write_manifest(tmp_path, data)
+
+    with pytest.raises(
+        ManifestError,
+        match="unresolved_when_any",
+    ):
+        load_bts_manifest(manifest_path)
+
 def test_accepts_planned_lifecycle_state(tmp_path):
     manifest_path = write_manifest(
         tmp_path,
@@ -179,7 +218,7 @@ def test_default_manifest_path_is_independent_of_working_directory(
 
     manifest = load_bts_manifest()
 
-    assert manifest.manifest_schema_version == 1
+    assert manifest.manifest_schema_version == 2
 
 
 def test_rejects_invalid_json(tmp_path):
@@ -195,7 +234,7 @@ def test_rejects_invalid_json(tmp_path):
 
 def test_rejects_unsupported_schema_version(tmp_path):
     data = committed_manifest_data()
-    data["manifest_schema_version"] = 2
+    data["manifest_schema_version"] = 3
     manifest_path = write_manifest(tmp_path, data)
 
     with pytest.raises(

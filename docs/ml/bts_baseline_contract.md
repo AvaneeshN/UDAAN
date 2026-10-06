@@ -1,7 +1,7 @@
 # BTS Baseline Disruption Model Contract
 
 Status: Draft  
-Contract version: 0.1  
+Contract version: 0.2  
 Dataset: BTS Reporting Carrier On-Time Performance  
 Model purpose: Pre-departure flight disruption risk estimation
 
@@ -106,6 +106,16 @@ target to become missing.
 
 Class 1 means that a significant disruption occurred.
 Class 0 means that no significant disruption occurred.
+If `Cancelled` or `Diverted` is missing or is not a valid binary value, the
+target is unresolved.
+
+If both indicators are zero but `ArrDelayMinutes` is missing, the target is
+also unresolved because the pipeline cannot prove whether the completed flight
+was on time or significantly delayed.
+
+Unresolved rows must be quarantined from supervised model training and included
+in the data-quality report. They must not be assigned class 0, and they must
+not be removed from the immutable raw dataset.
 
 ## 7. Direct model features
 
